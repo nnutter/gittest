@@ -8,9 +8,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// WithSetenvEnviron removes environment changes inherited from
-// git rebase --interactive --exec. It restores the original environment at
-// test cleanup. Do not call it in a parallel test or one with a parallel ancestor.
+// WithSetenvEnviron removes Git rebase's environment overrides, using
+// t.Setenv, because they can detrimnetally interfere with Git CLI invocations
+// during tests.
+//
+// Because t.Setenv affects the whole process, it cannot be used in parallel
+// tests or tests with parallel ancestors.
 func WithSetenvEnviron(t testing.TB) {
 	t.Helper()
 
