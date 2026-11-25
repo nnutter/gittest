@@ -34,6 +34,12 @@ func WithEnviron() []string {
 	return clean
 }
 
+// IsolatedEnviron returns WithEnviron with global and system Git config
+// disabled. Git still reads the repository's own config.
+func IsolatedEnviron() []string {
+	return append(WithEnviron(), "GIT_CONFIG_GLOBAL="+os.DevNull, "GIT_CONFIG_NOSYSTEM=1")
+}
+
 // WithSetenvEnviron applies the same isolation as WithEnviron to the process
 // environment and restores the original values at test cleanup. Do not call
 // it in parallel tests or tests with parallel ancestors.

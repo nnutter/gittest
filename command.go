@@ -1,6 +1,8 @@
 package gittest
 
 import (
+	"context"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -22,6 +24,14 @@ import (
 // PATH.
 func Command(t testing.TB, dir string, args ...string) *exec.Cmd {
 	t.Helper()
+	cmd, err := CommandContext(t.Context(), dir, args...)
+	require.NoError(t, err)
+	return cmd
+}
+
+// CommandContext is like Command but returns an error if Git is not on the
+// sanitized PATH. Use it for shared fixtures that do not have a testing.TB.
+func CommandContext(ctx context.Context, dir string, args ...string) (*exec.Cmd, error) {
 	env := WithEnviron()
 	for _, entry := range env {
 		key, path := splitEnv(entry)
@@ -34,13 +44,12 @@ func Command(t testing.TB, dir string, args ...string) *exec.Cmd {
 			}
 			git, err := exec.LookPath(filepath.Join(candidate, "git"))
 			if err == nil {
-				cmd := exec.CommandContext(t.Context(), git, args...)
+				cmd := exec.CommandContext(ctx, git, args...)
 				cmd.Dir = dir
 				cmd.Env = env
-				return cmd
+				return cmd, nil
 			}
 		}
 	}
-	require.FailNow(t, "git executable not found on sanitized PATH", "GIT_EXEC_PATH=%q", os.Getenv("GIT_EXEC_PATH"))
-	return nil
+	return nil, fmt.Errorf("git executable not found on sanitized PATH (GIT_EXEC_PATH=%q): %w", os.Getenv("GIT_EXEC_PATH"), exec.ErrNotFound)
 }
