@@ -14,6 +14,30 @@ import (
 	"github.com/nnutter/gittest"
 )
 
+func TestIsolatedEnvironIgnoresGlobalGitConfig(t *testing.T) {
+	home := t.TempDir()
+	config := filepath.Join(home, ".gitconfig")
+	require.NoError(t, os.WriteFile(config, []byte("[gittest]\n\tsetting = ambient\n"), 0o600))
+	t.Setenv("HOME", home)
+	t.Setenv("XDG_CONFIG_HOME", home)
+	t.Setenv("GIT_CONFIG_GLOBAL", config)
+
+	cmd := gittest.Command(t, home, "config", "--get", "gittest.setting")
+	require.NotNil(t, cmd)
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, "%s", out)
+	require.Equal(t, "ambient", strings.TrimSpace(string(out)))
+
+	cmd = gittest.Command(t, home, "config", "--get", "gittest.setting")
+	require.NotNil(t, cmd)
+	cmd.Env = gittest.IsolatedEnviron()
+	out, err = cmd.CombinedOutput()
+	var exit *exec.ExitError
+	require.ErrorAs(t, err, &exit, "%s", out)
+	require.Equal(t, 1, exit.ExitCode())
+	require.Empty(t, out)
+}
+
 func TestCommandUnderLinkedWorktreeRebase(t *testing.T) {
 	const fixtureKey = "GITTEST_REBASE_FIXTURE"
 	run := func(cmd *exec.Cmd) string {
