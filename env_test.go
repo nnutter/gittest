@@ -12,27 +12,34 @@ import (
 func TestWithSetenvEnviron(t *testing.T) {
 	const gitCore = "/opt/git/libexec/git-core"
 	originalPath := gitCore + string(os.PathListSeparator) + "/usr/bin"
-	t.Setenv("GIT_PREFIX", "")
-	t.Setenv("GIT_EXEC_PATH", gitCore)
-	t.Setenv("GIT_SEQUENCE_EDITOR", ":")
+	inherited := map[string]string{
+		"GIT_PREFIX":            "",
+		"GIT_EXEC_PATH":         gitCore,
+		"GIT_SEQUENCE_EDITOR":   "custom-editor",
+		"GIT_DIR":               "/parent/.git",
+		"GIT_WORK_TREE":         "/parent",
+		"GIT_INDEX_FILE":        "/parent/index",
+		"GIT_CONFIG_PARAMETERS": "'core.editor'='true'",
+	}
+	for key, value := range inherited {
+		t.Setenv(key, value)
+	}
 	t.Setenv("PATH", originalPath)
+	t.Setenv("GITTEST_OPT_IN", "kept")
 
 	t.Run("sanitized", func(t *testing.T) {
 		gittest.WithSetenvEnviron(t)
 
-		for _, key := range []string{"GIT_PREFIX", "GIT_EXEC_PATH", "GIT_SEQUENCE_EDITOR"} {
+		for key := range inherited {
 			_, ok := os.LookupEnv(key)
 			assert.False(t, ok, "%s should be unset", key)
 		}
 		assert.Equal(t, "/usr/bin", os.Getenv("PATH"))
+		assert.Equal(t, "kept", os.Getenv("GITTEST_OPT_IN"))
 	})
 
-	for key, want := range map[string]string{
-		"GIT_PREFIX":          "",
-		"GIT_EXEC_PATH":       gitCore,
-		"GIT_SEQUENCE_EDITOR": ":",
-		"PATH":                originalPath,
-	} {
+	inherited["PATH"] = originalPath
+	for key, want := range inherited {
 		got, ok := os.LookupEnv(key)
 		assert.True(t, ok, "%s should be restored", key)
 		assert.Equal(t, want, got, "%s after cleanup", key)

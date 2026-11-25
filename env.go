@@ -10,26 +10,20 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// WithEnviron returns a copy of the current environment with Git rebase's
-// environment overrides removed becuse they can detrimnetally interfere with
-// Git CLI invocations during tests.
-//
-// WithEnviron is an alternative to Command for parallel tests if used in
-// TestMain but it is sort of a "blunt instrument".
+// WithEnviron returns a copy of the current environment without inherited
+// GIT_* variables or GIT_EXEC_PATH entries in PATH. It does not change the
+// process environment and is safe to use in parallel tests. Append any
+// intentional Git overrides to the returned environment.
 func WithEnviron() []string {
 	env := os.Environ()
 	execPath := os.Getenv("GIT_EXEC_PATH")
 	clean := env[:0]
 	for _, entry := range env {
 		key, value := splitEnv(entry)
-		switch key {
-		case "GIT_PREFIX", "GIT_EXEC_PATH":
+		if isGitEnv(key) {
 			continue
-		case "GIT_SEQUENCE_EDITOR":
-			if value == ":" {
-				continue
-			}
-		case "PATH":
+		}
+		if key == "PATH" {
 			if path, keep := rebasePath(value, execPath); keep {
 				clean = append(clean, "PATH="+path)
 			}
@@ -40,12 +34,9 @@ func WithEnviron() []string {
 	return clean
 }
 
-// WithSetenvEnviron removes Git rebase's environment overrides, using
-// t.Setenv, because they can detrimnetally interfere with Git CLI invocations
-// during tests.
-//
-// Because t.Setenv affects the whole process, it cannot be used in parallel
-// tests or tests with parallel ancestors.
+// WithSetenvEnviron applies the same isolation as WithEnviron to the process
+// environment and restores the original values at test cleanup. Do not call
+// it in parallel tests or tests with parallel ancestors.
 func WithSetenvEnviron(t testing.TB) {
 	t.Helper()
 
@@ -57,11 +48,16 @@ func WithSetenvEnviron(t testing.TB) {
 		t.Setenv("PATH", rest)
 	}
 
-	unsetenv(t, "GIT_PREFIX")
-	unsetenv(t, "GIT_EXEC_PATH")
-	if os.Getenv("GIT_SEQUENCE_EDITOR") == ":" {
-		unsetenv(t, "GIT_SEQUENCE_EDITOR")
+	for _, entry := range os.Environ() {
+		key, _ := splitEnv(entry)
+		if isGitEnv(key) {
+			unsetenv(t, key)
+		}
 	}
+}
+
+func isGitEnv(key string) bool {
+	return strings.HasPrefix(key, "GIT_")
 }
 
 func splitEnv(entry string) (key, value string) {
