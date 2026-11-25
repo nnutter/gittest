@@ -1,0 +1,65 @@
+[tools]
+# hk is the only pinned tool. Its version must equal the version in hk.pkl, in
+# both the hk import and the hk-config import.
+hk = "2.14.0"
+jactionlint = "latest"
+go = "latest"
+betterleaks = "latest"
+gofumpt = "latest"
+pkl = "latest"
+staticcheck = "latest"
+tombi = "latest"
+yamlfmt = "latest"
+"packslip:nnutter/constable" = { version = "latest", minimum_release_age = "0" }
+"packslip:nnutter/mdlint" = { version = "latest", minimum_release_age = "0" }
+"packslip:nnutter/timber" = { version = "latest", minimum_release_age = "0" }
+"github:securego/gosec" = "latest"
+# Published gohawk binaries can use an older Go toolchain than the project.
+"go:github.com/kojah/gohawk" = "latest"
+"go:golang.org/x/tools/cmd/goimports" = "latest"
+"go:golang.org/x/vuln/cmd/govulncheck" = "latest"
+
+[tasks.all]
+description = "Run fix, test, and check"
+run = [{ task = "fix" }, { task = "test" }, { task = "check" }]
+
+[tasks.ci-test]
+description = "Run tests with the race detector and shuffled order"
+run = "go test -race -shuffle=on ./..."
+
+[tasks.coverage]
+alias = "cover"
+description = "Run tests and generate coverage report"
+run = "go test -coverprofile=coverage.out -covermode=atomic ./... && go tool cover -func=coverage.out"
+
+[tasks.setup]
+description = "Install hk git hooks"
+run = "hk install --mise"
+
+[tasks.test]
+description = "Run tests with coverage"
+run = "go test -cover ./..."
+
+[tasks.fix]
+description = "Fix all files, or only the supplied files"
+usage = 'arg "[staged_files]" var=#true'
+run = '''
+if [ -z "${usage_staged_files:-}" ]; then
+  hk fix --all
+else
+  hk fix ${usage_staged_files}
+fi
+'''
+
+[tasks.check]
+description = "Check all files without writing fixes"
+run = "hk check --all"
+
+[tasks.on-start]
+description = "Pi mise-hooks: run fix, test, and check before agent starts"
+run = [{ task = "all" }]
+
+[tasks.on-stop]
+description = "Pi mise-hooks: fix edited files, then test and check"
+usage = 'arg "[staged_files]" var=#true'
+run = ["mise run fix ${usage_staged_files}", "mise run test", "mise run check"]
