@@ -8,10 +8,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// SanitizeRebaseEnv removes environment changes inherited from
+// WithSetenvEnviron removes environment changes inherited from
 // git rebase --interactive --exec. It restores the original environment at
 // test cleanup. Do not call it in a parallel test or one with a parallel ancestor.
-func SanitizeRebaseEnv(t testing.TB) {
+func WithSetenvEnviron(t testing.TB) {
 	t.Helper()
 
 	if execPath := os.Getenv("GIT_EXEC_PATH"); execPath != "" {

@@ -9,7 +9,7 @@ import (
 	"github.com/nnutter/gittest"
 )
 
-func TestSanitizeRebaseEnv(t *testing.T) {
+func TestWithSetenvEnviron(t *testing.T) {
 	const gitCore = "/opt/git/libexec/git-core"
 	originalPath := gitCore + string(os.PathListSeparator) + "/usr/bin"
 	t.Setenv("GIT_PREFIX", "")
@@ -18,7 +18,7 @@ func TestSanitizeRebaseEnv(t *testing.T) {
 	t.Setenv("PATH", originalPath)
 
 	t.Run("sanitized", func(t *testing.T) {
-		gittest.SanitizeRebaseEnv(t)
+		gittest.WithSetenvEnviron(t)
 
 		for _, key := range []string{"GIT_PREFIX", "GIT_EXEC_PATH", "GIT_SEQUENCE_EDITOR"} {
 			_, ok := os.LookupEnv(key)
