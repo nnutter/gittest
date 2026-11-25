@@ -14,6 +14,13 @@ import (
 	"github.com/nnutter/gittest"
 )
 
+func TestCommandContextReportsMissingGit(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("PATH", dir)
+	_, err := gittest.CommandContext(t.Context(), dir, "--version")
+	require.ErrorIs(t, err, exec.ErrNotFound)
+}
+
 func TestIsolatedEnvironIgnoresGlobalGitConfig(t *testing.T) {
 	home := t.TempDir()
 	config := filepath.Join(home, ".gitconfig")
