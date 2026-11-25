@@ -2,11 +2,43 @@ package gittest
 
 import (
 	"os"
+	"runtime"
+	"slices"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
+
+// WithEnviron returns a copy of the current environment with Git rebase's
+// environment overrides removed becuse they can detrimnetally interfere with
+// Git CLI invocations during tests.
+//
+// WithEnviron is an alternative to Command for parallel tests if used in
+// TestMain but it is sort of a "blunt instrument".
+func WithEnviron() []string {
+	env := os.Environ()
+	execPath := os.Getenv("GIT_EXEC_PATH")
+	clean := env[:0]
+	for _, entry := range env {
+		key, value := splitEnv(entry)
+		switch key {
+		case "GIT_PREFIX", "GIT_EXEC_PATH":
+			continue
+		case "GIT_SEQUENCE_EDITOR":
+			if value == ":" {
+				continue
+			}
+		case "PATH":
+			if path, keep := rebasePath(value, execPath); keep {
+				clean = append(clean, "PATH="+path)
+			}
+			continue
+		}
+		clean = append(clean, entry)
+	}
+	return clean
+}
 
 // WithSetenvEnviron removes Git rebase's environment overrides, using
 // t.Setenv, because they can detrimnetally interfere with Git CLI invocations
@@ -17,13 +49,12 @@ import (
 func WithSetenvEnviron(t testing.TB) {
 	t.Helper()
 
-	if execPath := os.Getenv("GIT_EXEC_PATH"); execPath != "" {
-		path := os.Getenv("PATH")
-		if rest, ok := strings.CutPrefix(path, execPath+string(os.PathListSeparator)); ok {
-			t.Setenv("PATH", rest)
-		} else if path == execPath {
-			unsetenv(t, "PATH")
-		}
+	path := os.Getenv("PATH")
+	execPath := os.Getenv("GIT_EXEC_PATH")
+	if rest, keep := rebasePath(path, execPath); !keep {
+		unsetenv(t, "PATH")
+	} else if rest != path {
+		t.Setenv("PATH", rest)
 	}
 
 	unsetenv(t, "GIT_PREFIX")
@@ -31,6 +62,26 @@ func WithSetenvEnviron(t testing.TB) {
 	if os.Getenv("GIT_SEQUENCE_EDITOR") == ":" {
 		unsetenv(t, "GIT_SEQUENCE_EDITOR")
 	}
+}
+
+func splitEnv(entry string) (key, value string) {
+	key, value, _ = strings.Cut(entry, "=")
+	if runtime.GOOS == "windows" {
+		key = strings.ToUpper(key)
+	}
+	return key, value
+}
+
+func rebasePath(path, execPath string) (value string, keep bool) {
+	if execPath == "" {
+		return path, true
+	}
+	// Launchers such as go test can prepend PATH entries after rebase did.
+	separator := string(os.PathListSeparator)
+	dirs := slices.DeleteFunc(strings.Split(path, separator), func(dir string) bool {
+		return dir == execPath
+	})
+	return strings.Join(dirs, separator), len(dirs) != 0
 }
 
 func unsetenv(t testing.TB, key string) {
