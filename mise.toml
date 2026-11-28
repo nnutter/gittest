@@ -32,7 +32,8 @@ alias = "cover"
 description = "Run tests and generate coverage report"
 run = "go test -coverprofile=coverage.out -covermode=atomic ./... && go tool cover -func=coverage.out"
 
-[tasks.setup]
+[tasks.install]
+alias = "setup"
 description = "Install hk git hooks"
 run = "hk install --mise"
 
@@ -54,6 +55,10 @@ fi
 [tasks.check]
 description = "Check all files without writing fixes"
 run = "hk check --all"
+
+[tasks.validate]
+description = "Run checks and tests without applying fixes"
+run = [{ task = "check" }, { task = "test" }]
 
 [tasks.on-start]
 description = "Pi mise-hooks: run fix, test, and check before agent starts"
